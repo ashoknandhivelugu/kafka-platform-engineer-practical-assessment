@@ -1,1 +1,8 @@
+---
+- name: Managed Coordinated Broker Rolling Maintenance
+  hosts: brokers
+  become: true
+  serial: 1 # Constraint: Enforces that brokers restart strictly one at a time
+  roles:
+    - kafka-rolling-restart
 
