@@ -1,1 +1,46 @@
+---
+- name: Evaluate and template server properties configuration
+  ansible.builtin.template:
+    src: server.properties.j2
+    dest: /etc/kafka/server.properties
+    owner: kafka
+    group: kafka
+    mode: '0640'
+  register: config_template_status
+
+- name: Execute gated rolling restart sequence safely
+  block:
+    - name: Fetch active under-replicated partition count from cluster
+      ansible.builtin.shell: >
+        set -o pipefail && \
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 \
+        --describe --under-replicated-partitions | wc -l
+      executable: /bin/bash
+      register: cluster_urp_count
+      changed_when: false
+      failed_when: false
+
+    - name: Enforce safety gate and fail if under-replicated partitions exist
+      ansible.builtin.fail:
+        msg: "Safety Check Failed: {{ cluster_urp_count.stdout | trim }} under-replicated partitions detected. Aborting."
+      when: (cluster_urp_count.stdout | trim | int) > 0
+
+    - name: Restart the Kafka daemon process
+      ansible.builtin.systemd:
+        name: kafka
+        state: restarted
+
+    - name: Wait for network port binding to verify broker recovery
+      ansible.builtin.wait_for:
+        port: 9092
+        delay: 5
+        timeout: 90
+        state: started
+
+    - name: Cooldown pause to allow ISR logs synchronization settle time
+      ansible.builtin.pause:
+        seconds: 20
+
+  # Constraint: This block runs *only* if the configuration template changed (Idempotency)
+  when: config_template_status.changed
 
