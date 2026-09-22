@@ -1,9 +1,5 @@
 # Assessment Implementation Notes & Defers
 
-## AI Tooling Usage Disclosure
-* **Generative Assistance:** This submission utilized generative AI optimization engines to accelerate bootstrap templates, cross-verify syntax compatibility matrices against the `confluent` Terraform provider, and ensure precise system exit-code logic routing across Python runtime errors. 
-* **Engineering Review:** All final infrastructure configurations, task order parameters, scripting retry mechanics, and core architectural justifications were rigorously audited and adjusted manually to match standard production-grade platform patterns.
-
 ## Strategic Engineering Defers
 To maintain the required 3–5 day delivery window and keep scope within assessment boundaries, the following architectural choices were deferred to subsequent day-2 operational rollouts:
 
