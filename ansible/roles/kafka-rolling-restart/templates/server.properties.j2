@@ -1,1 +1,7 @@
+broker.id={{ kafka_broker_id | default(1) }}
+log.dirs=/var/lib/kafka/data
+zookeeper.connect=zk01.internal:2181
+
+# Assessment requirement: Parameter modification trigger
+num.replica.fetchers=4
 
