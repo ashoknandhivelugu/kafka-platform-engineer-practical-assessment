@@ -4,15 +4,19 @@
 
 ### 1.1 Durability basics
 **What does acks=all actually wait for?**
+
 `acks=all` (or `acks=-1`) forces the producer to block until the partition leader **and all active members of the In-Sync Replica (ISR) pool** acknowledge the append operation. When paired with `min.insync.replicas=2`, a minimum of **2 healthy brokers** (the leader plus at least 1 synchronized follower) must commit the record to their local logs before the cluster issues a success acknowledgment to the client.
 
 **What happens when one broker holding a replica goes offline?**
+
 With a Replication Factor of 3 (`RF=3`), losing a single broker shrinks the active ISR pool from 3 down to 2. Because this still satisfies the `min.insync.replicas=2` threshold, the cluster state updates gracefully. **Production pipelines continue running normally** with zero data loss and no producer runtime exceptions.
 
 **What happens when two brokers go offline?**
+
 When two brokers go offline simultaneously, the ISR pool shrinks to 1 (the remaining partition leader). Because the active ISR size (1) is now strictly less than the configured `min.insync.replicas=2`, the leader broker will reject incoming append requests from producers using `acks=all`. The producer client will receive a `NotEnoughReplicasException` (or `NotEnoughReplicasAfterAppendException`). Note that data read availability remains intact: consumers can still read existing committed data from the single remaining alive broker.
 
 **Why is min.insync.replicas=2 (not 3) a common choice?**
+
 Setting `min.insync.replicas=3` requires absolute synchronization across all nodes. Under that constraint, the failure or maintenance of any single broker instantly triggers a total write outage. Configuring it to 2 provides an optimal structural balance:
 * **Fault Tolerance:** Safely tolerates the loss of exactly 1 broker without dropping service.
 * **Durability:** Guarantees that at least 2 distinct physical copies of the data exist before a write is confirmed.
@@ -53,6 +57,7 @@ A frequent operational pitfall is failing to attach the Confluent Private DNS zo
 
 ### 1.3 Producer latency triage
 **4 likely causes (ranked most-to-least likely):**
+
 1. **Network Congestion or Elevated Round-Trip Time (RTT):** Physical routing degradation or interface saturation between the application runtime and the cloud brokers.
 2. **Stop-the-World JVM Garbage Collection Pauses:** Heavy broker-side garbage collection cycles that freeze application processing threads without reflecting as sustained host CPU utilization.
 3. **Producer Batching Configuration Adjustments:** Recent changes or systemic drifts in client parameters (`batch.size` or `linger.ms`) forcing the accumulator to buffer records longer before pushing to the wire.
@@ -82,14 +87,17 @@ jstat -gcutil $(pgrep -f "kafka.Kafka") 1000 30
 
 ### 1.4 Ansible change gone wrong
 **Why is serial: 3 unsafe here?**
+
 In a 6-broker cluster architecture handling topics with a replication factor of 3 (`RF=3`), restarting 3 brokers simultaneously breaks the availability boundaries of the system. If those 3 targeted nodes happen to hold the complete set of replicas for a specific partition, that partition immediately drops completely offline. **Simultaneous loss of ≥ RF nodes guarantees data unavailability.** As a strict engineering rule, never restart more than RF-1 nodes at the same time. For an `RF=3` topology, `serial: 1` is the only safe execution pattern.
 
 **3 safety checks the play should include:**
+
 1. **Pre-Flight Cluster Health Gating:** Assert that the cluster-wide count of `UnderReplicatedPartitions == 0` before initiating a task on any individual broker. Halt execution immediately if any imbalance is caught.
 2. **Post-Restart Synchronous Health Gate:** A blocking, retrying task that forces the playbook to wait until the restarted broker successfully rejoins its assigned ISR pools and the global URP count converges back to 0 before unlocking the next host.
 3. **Strict Concurrency Enforcement:** Hardcode linear execution parameters (`serial: 1`) to guarantee that under no circumstances can parallel node bounces occur.
 
 **List the recovery steps in order:**
+
 1. **Terminate the Automation Execution:** Immediately issue an abort/kill command to the running Ansible pipeline to stop additional uncoordinated restarts on the remaining 3 healthy nodes.
 2. **Audit & Discover Cluster Health:** Query the cluster topology to pinpoint which specific broker daemons failed to register back online:
    ```bash
@@ -109,6 +117,7 @@ In a 6-broker cluster architecture handling topics with a replication factor of 
 ---
 
 ### 1.5 ZooKeeper vs KRaft — short check
+
 ZooKeeper in a Kafka cluster manages 
 all cluster metadata: broker registration,
 controller election, topic partition 
